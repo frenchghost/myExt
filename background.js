@@ -14,6 +14,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.message.includes("awaitElement-")) {
     startCheckingElement(request.message.split("awaitElement-")[1]);
   }
+
+  if(request.message.includes("checkForElement-")) {
+
+  }
 });
 
 function establishWebSocketConnection(port) {
@@ -53,7 +57,17 @@ function sendMessageToWebSocket(data) {
     console.error('WebSocket is not open or initialized.');
   }
 }
-
+function checkForElement(elementSelector) {
+  chrome.tabs.sendMessage(tab.id, { message: "CheckForElement", elementSelector }, function(response) {
+    console.log(response);
+    if (response && response.elementFound) {
+      ws.send(`elementfound-${elementSelector}`);
+      console.log("Element found!");
+    } else {
+      ws.send(`element not found-${elementSelector}`)
+    }
+  });
+}
 function startCheckingElement(elementSelector) {
   clearInterval(checkElementInterval);
 

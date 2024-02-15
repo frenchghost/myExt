@@ -14,7 +14,6 @@ if (window.location.href === "https://www.nike.com/") {
 // Listen for messages from the background script
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.message === "CheckForElement") {
-    let elementFoundLoop = false
         const elementSelector = request.elementSelector;
     const element = document.querySelector(elementSelector);
     if(element) {
