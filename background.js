@@ -2,6 +2,31 @@ let ws;
 let extensionId;
 let checkElementInterval;
 
+
+function callbackFn(details) {
+
+  console.log('Authentication Required for URL:', details.url);
+  console.log(details.url.includes("?"))
+if(details.url.includes("?")) {
+  console.log(details.url.split("?")[1])
+  return {
+    authCredentials: {
+      username: details.url.split("?")[1].split(":")[0],
+      password: details.url.split("?")[1].split(":")[1]
+    }
+  };
+} else {
+  return { cancel: false }; // Continue without authentication for non-proxy requests
+}
+}
+
+chrome.webRequest.onAuthRequired.addListener(
+  callbackFn,
+  { urls: ["<all_urls>"] },
+  ['blocking']
+);
+
+
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if (request.message === "SendMessageToWebSocket") {
     sendMessageToWebSocket(request.data);
@@ -117,6 +142,10 @@ function handleWebSocketCommand(command) {
     });
   }
 
+  if (request.message === "getcurrenturl") {
+    getCurrentURL();
+  }
+
   // Add more commands as needed
 }
 
@@ -124,6 +153,14 @@ function navigateToURL(url) {
   chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
     const tabId = tabs[0].id;
     chrome.tabs.update(tabId, { url: url });
+  });
+}
+
+function getCurrentURL() {
+  chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+    const currentURL = tabs[0].url;
+    ws.send(`currentURL-${currentURL}`);
+    console.log("Current URL sent to WebSocket:", currentURL);
   });
 }
 
