@@ -1,22 +1,28 @@
 let ws;
 let extensionId;
 let checkElementInterval;
+let username 
+let password
 
 
 function callbackFn(details) {
-
   console.log('Authentication Required for URL:', details.url);
   console.log(details.url.includes("?"))
 if(details.url.includes("?")) {
   console.log(details.url.split("?")[1])
   return {
     authCredentials: {
-      username: details.url.split("?")[1].split(":")[0],
-      password: details.url.split("?")[1].split(":")[1]
+      username: details.url.split("?")[1].split(":")[2],
+      password: details.url.split("?")[1].split(":")[3]
     }
   };
-} else {
-  return { cancel: false }; // Continue without authentication for non-proxy requests
+} else if(username && password) {
+  return {
+    authCredentials: {
+      username: username,
+      password: password
+    }
+  }
 }
 }
 
@@ -33,6 +39,30 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 
   if (request.message.includes("ReadyToConnect-")) {
+    proxy = request.message.split("ReadyToConnect-")
+    if(proxy.includes("?") && !password  && !username) {
+      chrome.proxy.settings.set({
+        value: {
+          mode: "fixed_servers",
+          rules: {
+            singleProxy: {
+              scheme: "http",
+              host: proxy.split("?")[1].split(":")[0],
+              port: parseInt(proxy.split("?")[1].split(":")[1]) // Replace with your proxy port
+            },
+            // 154.21.18.113:3128:ftva778:wvyelemkjgmgq
+            bypassList: ["<local>"]
+          }
+        },
+        scope: "regular"
+      }, function() {
+        console.log("Proxy configured");
+      });
+       username =  proxy.split("?")[1].split(":")[2]
+       password = proxy.split("?")[1].split(":")[3]
+       navigateToURL("https://google.com/" + request.message.split("ReadyToConnect-")[1])
+    }
+    console.log("yes")
     establishWebSocketConnection(request.message.split("ReadyToConnect-")[1]);
   }
 
@@ -43,9 +73,11 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   if(request.message.includes("checkForElement-")) {
 
   }
+
 });
 
 function establishWebSocketConnection(port) {
+  console.log("establishWebSocketConnection")
   const wsUrl = `ws://localhost:${port}`;
   extensionId = generateRandomId();
   ws = new WebSocket(wsUrl);
@@ -93,6 +125,21 @@ function checkForElement(elementSelector) {
     }
   });
 }
+function GetElementResults(elementSelector) {
+  console.log("getting Element")
+  chrome.tabs.query({}, function(tabs) {
+    tabs.forEach(function(tab) {
+      chrome.tabs.sendMessage(tab.id, { message: "GetElementResults", elementSelector }, function(response) {
+        console.log(response);
+        if(response.element) {
+        console.log("got Element")
+        console.log(response.element)
+          ws.send(`elementResults-${response.element}`)
+        }
+      });
+    });
+  });
+}
 function startCheckingElement(elementSelector) {
   clearInterval(checkElementInterval);
 
@@ -124,8 +171,13 @@ function evalScript(expression, tabId) {
 }
 
 function handleWebSocketCommand(command) {
-  if (command.split("-")[0] === "goto") {
-    navigateToURL(command.split("-")[1]);
+  if (command.split("--")[0] === "goto") {
+    navigateToURL(command.split("--")[1]);
+  }
+
+  if (command.includes("awaitElement-")) {
+    const elementSelector = command.split("awaitElement-")[1];
+    startCheckingElement(elementSelector);
   }
 
   if (command.includes("awaitElement-")) {
@@ -142,7 +194,11 @@ function handleWebSocketCommand(command) {
     });
   }
 
-  if (request.message === "getcurrenturl") {
+  if (command.includes("getElement-")) {
+    GetElementResults(command.split("getElement-")[1]);
+  }
+  
+  if (command = "getcurrenturl") {
     getCurrentURL();
   }
 
